@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Video checker</title>
+
+    <script src="{{ url_for('static', filename='js/jquery-latest.min.js') }}"></script>
+
+    <style>
+        .aParent div {
+            float: left;
+            clear: none;
+        }
+        #div_video_list{
+            overflow: scroll; height: 600px; width: 33%; resize: both;
+        }
+        #div_img_viewer{
+            height: 600px; width: 66%; resize: both;
+        }
+        #img_viewer{
+            margin-left: 15px;
+        }
+        .img_icon{
+            height:50px;
+        }
+        .video_name_span, .test_file{
+            cursor: pointer;
+        }
+        .selected_video{
+            font-weight: bold;
+        }
+        #img_gallery{
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<p class="test_file">/local/home/li/yolov5/runs/train/exp97/test_video/test_video_ori_coord_log_2022-04-13_180008.json</p>
+<p class="test_file">/local/home/li/yolov5/runs/train/exp111/val_video/val_video_ori_coord_log_2022-04-13_022129.json</p>
+
+<label for="logger_file">Path to AIlogger file:</label>
+<input type="text" id="logger_file" name="logger_file" value="{{logger_file}}"></br>
+
+<label for="min_display_conf">Min display conf:</label>
+<input type="text" id="min_display_conf" name="min_display_conf" value="0.1"></br>
+
+<label for="frame_name">Frame name:</label>
+<button id="frame_down"> - </button>
+<input type="text" id="frame_name" name="frame_name" value="0">
+<button id="frame_up"> + </button>
+
+<div class="aParent">
+    <div id="div_video_list">
+        <ul id="ul_video_list">
+        {% for i in logger_profile %}
+            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames)</span></a></li>
+		{% endfor %}
+        </ul>
+    </div>
+    <div id="div_img_viewer">
+        <p><a id="gif_link" target="_blank">Download gif</a></p>
+        <img id="img_viewer" width="100%">
+        <div id="img_gallery"></div>
+    </div>
+</div>
+<script>
+var cur_frame_id = 0;
+var img_src_dict;
+
+$(function() {
+
+    //fill logger file from click
+    $(document).on("click", ".test_file", function() {
+        $("#logger_file").val($(this).text()).change();
+    });
+
+    //get list of videos from json
+    $(document).on("change", "#logger_file", function() {
+        var logger_file_path = $("#logger_file").val();
+        $.ajax({
+            url: "/get_video_list",
+            method: "POST",
+            data: {
+                "logfile_name": logger_file_path,
+            },
+            success: function (response) {
+                response_a = response
+                console.log(response);
+                if ('logger_profile' in response){
+                    logger_profile = response['logger_profile']
+                    $("#ul_video_list").empty()
+                    for (i = 0; i < logger_profile.length; ++i) {
+                        video_obj = logger_profile[i]
+                        $("#ul_video_list").append(
+                            $("<li>").append(
+                                $('<a>').append(
+                                    $('<span>').attr('class', 'video_name_span')
+                                    .attr('video_name', video_obj['video_name']).append(video_obj['video_name']+
+                                        ' ('+video_obj['frame_num']+' frames)')
+                                )
+                            )
+                        )
+                    }
+                }
+                else if ('err' in response){
+                    alert(response['err'])
+                }
+                else{
+                    console.log('no response from logger file')
+                }
+            }
+        })
+    });
+
+    //click on video name to display
+    $(document).on("click", ".video_name_span", function() {
+        //clear highlight for last selected video
+        $(".selected_video").removeClass("selected_video");
+        var video_name = $(this).attr("video_name")
+        console.log("submit get" + "/load_video?video_name="+video_name+"&min_display_conf="+$("#min_display_conf").val())
+        $.ajax({
+            url: "/load_video?video_name="+video_name+"&min_display_conf="+$("#min_display_conf").val(),
+            method: "GET",
+            success: function (response) {
+                response_a = response
+                if ('img_src_dict' in response){
+                    img_src_dict = response['img_src_dict'];
+                    cur_frame = Object.keys(img_src_dict)[cur_frame_id]
+                    $("#img_viewer").attr("src", "/"+img_src_dict[cur_frame]+"?"+Date.now());
+                    $("#img_gallery").empty();
+                    for (const [cur_frame_id, src_i] of Object.entries(img_src_dict)) {
+                        $("#img_gallery").append(
+                            $("<img>").attr("class", "img_icon")
+                                    .attr("frame_id", cur_frame_id)
+                                    .attr("title", cur_frame_id)
+                                    .attr("height", "50px")
+                                    .attr("src", "/"+src_i+"?"+Date.now())  //add time stamp to force image refresh in browser
+                        );
+                    }
+                    //highlight selected video name in the list
+                    $(".video_name_span[video_name='"+video_name+"']").addClass("selected_video");
+                    //add link to gif download
+                    $("#gif_link").attr("href","/static/cache_imgs/"+video_name+'/'+video_name.replace("/","_")+".gif");
+                }
+                else{
+                    console.log("load_video failed")
+                }
+            }
+        })
+    });
+
+
+    function switch_to_next_frame () {
+        cur_frame_id += 1;
+        if (cur_frame_id>=Object.keys(img_src_dict).length){
+            cur_frame_id = Object.keys(img_src_dict).length-1;
+        }
+        cur_frame = Object.keys(img_src_dict)[cur_frame_id]
+        $("#img_viewer").attr("src", $("img[frame_id="+cur_frame+"]").attr("src"));
+        $("#frame_name").val(cur_frame_id);
+    }
+
+    function switch_to_prev_frame () {
+        cur_frame_id -= 1;
+        if (cur_frame_id<0){
+            cur_frame_id = 0;
+        }
+        cur_frame = Object.keys(img_src_dict)[cur_frame_id]
+        $("#img_viewer").attr("src", $("img[frame_id="+cur_frame+"]").attr("src"));
+        $("#frame_name").val(cur_frame_id);
+    }
+
+    $(document).on("click", "#frame_up", function() {
+        switch_to_next_frame();
+    });
+
+    $(document).on("click", "#frame_down", function() {
+        switch_to_prev_frame();
+    });
+
+    $(document).on("click", ".img_icon", function() {
+        cur_frame_id = parseInt($(this).attr("frame_id"));
+        cur_frame = Object.keys(img_src_dict)[cur_frame_id]
+        $("#img_viewer").attr("src", $("img[frame_id="+cur_frame+"]").attr("src"));
+        $("#frame_name").val(cur_frame_id);
+    });
+
+    $(document).keydown(function(event){
+        if (event.keyCode==37 || event.keyCode==38){
+            switch_to_prev_frame();
+        }
+        else if (event.keyCode==39 || event.keyCode==40){
+            switch_to_next_frame();
+        }
+    });
+
+});
+</script>
+</body>
+</html>
