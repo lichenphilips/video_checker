@@ -54,6 +54,7 @@ def load_video():
 	dcm_scan_param_csv_file = '/home/pj-019468-si/BARDA_ID/Code/barda_lus/blines/image_proc_algorithm/Read_params_from_DICOMS/output/medstar_dicom_scan_params_updated.csv'
 	dcm_cropped_imgs = get_ori_video(video_name, app.logger, min_display_conf=min_display_conf, img_type='jpg',
 									 cls_names=['Con','SPC'], dcm_scan_param_csv_file=dcm_scan_param_csv_file)
+	dir_path = os.path.dirname(os.path.realpath(__file__))
 	cache_dir = 'static/cache_imgs'
-	img_src_dict = cache_display_images(dcm_cropped_imgs,video_name,app.logger.results[video_name].keys(),cache_dir)
+	img_src_dict = cache_display_images(dcm_cropped_imgs,video_name,app.logger.results[video_name].keys(),cache_dir,dir_path)
 	return {'img_src_dict': img_src_dict}

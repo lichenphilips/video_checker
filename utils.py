@@ -149,20 +149,20 @@ def crop_dcm_img(dcm_img, path, dcm_scan_param_csv_file):
                            geo['right'] - geo['left'], geo['bottom'] - geo['top'])
 
 #save predicted image to server cache
-def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir):
+def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_path):
     img_src_dict = {}
-    if not os.path.exists(cache_dir+'/'+video_name):
-        os.makedirs(cache_dir+'/'+video_name)
+    if not os.path.exists(dir_path+'/'+cache_dir+'/'+video_name):
+        os.makedirs(dir_path+'/'+cache_dir+'/'+video_name)
     img_max_int = np.max(dcm_cropped_imgs)
     imgs_uint8 = []
     for fi, frame_name in enumerate(frame_names):
         cache_filename = cache_dir+'/'+video_name+'/'+frame_name+'.jpg'
         img = dcm_cropped_imgs[fi]
         img_uint8 = (img / img_max_int * 255).astype(np.uint8)
-        cv2.imwrite(cache_filename, img_uint8)
+        cv2.imwrite(dir_path+'/'+cache_filename, img_uint8)
         imgs_uint8.append(img_uint8)
         img_src_dict[frame_name] = cache_filename
-    gif_filename = cache_dir + '/' + video_name + '/' + (video_name).replace('/', '_') + '.gif'
-    print('save gif',gif_filename)
+    gif_filename = dir_path + '/' + cache_dir + '/' + video_name + '/' + (video_name).replace('/', '_') + '.gif'
+    print('save gif', gif_filename)
     imageio.mimsave(gif_filename, imgs_uint8, fps=5)
     return img_src_dict

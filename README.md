@@ -16,8 +16,6 @@ To start server, run:
 
 `conda activate flask`
 
-`cd /local/home/li/video_checker/`
-
 `export FLASK_APP=/local/home/li/video_checker/app.py`
 
 `flask run --host=0.0.0.0 --port=6001`
