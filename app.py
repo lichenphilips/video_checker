@@ -1,10 +1,7 @@
 import flask
-from flask import Flask, request, session, render_template
+from flask import Flask, request, render_template
 from utils import get_ori_video, cache_display_images
 from logger_utils import AILogger
-import json
-import datetime
-import calendar
 import os
 
 app = Flask(__name__)
