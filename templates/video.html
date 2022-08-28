@@ -40,7 +40,7 @@
 <p class="test_file">/local/home/li/yolov5/runs/train/exp111/val_video/val_video_ori_coord_log_2022-04-13_022129.json</p>
 
 <label for="logger_file">Path to AIlogger file:</label>
-<input type="text" id="logger_file" name="logger_file" value="{{logger_file}}"></br>
+<input type="text" id="logger_file" name="logger_file" value="{{logger_file}}" style="width: 800px;"></br>
 
 <label for="min_display_conf">Min display conf:</label>
 <input type="text" id="min_display_conf" name="min_display_conf" value="0.1"></br>
@@ -118,9 +118,9 @@ $(function() {
         //clear highlight for last selected video
         $(".selected_video").removeClass("selected_video");
         var video_name = $(this).attr("video_name")
-        console.log("submit get" + "/load_video?video_name="+video_name+"&min_display_conf="+$("#min_display_conf").val())
+        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&min_display_conf="+$("#min_display_conf").val())
         $.ajax({
-            url: "/load_video?video_name="+video_name+"&min_display_conf="+$("#min_display_conf").val(),
+            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&min_display_conf="+$("#min_display_conf").val(),
             method: "GET",
             success: function (response) {
                 response_a = response
@@ -141,7 +141,7 @@ $(function() {
                     //highlight selected video name in the list
                     $(".video_name_span[video_name='"+video_name+"']").addClass("selected_video");
                     //add link to gif download
-                    $("#gif_link").attr("href","/static/cache_imgs/"+video_name+'/'+video_name.replace("/","_")+".gif");
+                    $("#gif_link").attr("href","/static/cache_imgs/"+video_name+'/'+video_name.replaceAll("/","_")+"_"+$("#min_display_conf").val()+".gif");
                 }
                 else{
                     console.log("load_video failed")

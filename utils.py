@@ -5,6 +5,7 @@ import os
 import pydicom
 import pandas as pd
 import imageio
+from matplotlib.colors import hsv_to_rgb
 
 def paint_img_with_bb(image ,boxes ,labels=[] ,title=None ,min_display_conf=0 ,cls_names=None):
     int_max =  1  # np.max(image)
@@ -27,7 +28,12 @@ def paint_img_with_bb(image ,boxes ,labels=[] ,title=None ,min_display_conf=0 ,c
             # labels
             edgecolor = [int_max, int_max, int_max]
         else:
-            edgecolor = [box['conf'] * int_max, 0, (1 - box['conf']) * int_max]
+            #blue to red color bar
+            #edgecolor = [box['conf'] * int_max, 0, (1 - box['conf']) * int_max]
+            #dark orange to bright orange
+            edgecolor = hsv_to_rgb([16/239,1,min(1,(max(0,box['conf']-min_display_conf))*2)]) * int_max
+            #pass BGR to cv2 color
+            edgecolor = edgecolor[::-1]
             # edgecolor = colors[int(cls)]
 
         start_point = (int(round(labels_xyxy[0])), int(round(labels_xyxy[1])))
@@ -49,7 +55,7 @@ def paint_img_with_bb(image ,boxes ,labels=[] ,title=None ,min_display_conf=0 ,c
             image = cv2.putText(image, title, (30, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
                                 color=(int_max, int_max, int_max), thickness=1)
         else:
-            title_splits = title.split('/')
+            title_splits = title.replace('/local/home/li/cache/','').split('/')
             for si, title_split in enumerate(title_splits):
                 image = cv2.putText(image, title_split, (30, 30 + (si * 20)), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65,
                                     color=(int_max, int_max, int_max), thickness=1)
@@ -101,7 +107,7 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True,
         dcm_cropped_imgs, img_offset = crop_dcm_img(dcm_img, video_name + '.dcm', dcm_scan_param_csv_file)
         dcm_cropped_imgs = dcm_cropped_imgs / np.max(dcm_cropped_imgs)
         imgs = []
-        for frame_name in logger.results[video_name]:
+        for frame_name in sorted(logger.results[video_name].keys(),key=lambda x:int(x)):
             frame_id = int(frame_name)
             if show_preds:
                 boxes = logger.results[video_name][frame_name]['boxes']
@@ -112,6 +118,31 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True,
             else:
                 labels = []
             img_bb = paint_img_with_bb(dcm_cropped_imgs[frame_id], boxes, labels, video_name + '_' + frame_name,
+                                       min_display_conf, cls_names)
+            imgs.append(img_bb)
+    elif img_type == 'npz':
+        if 'data_dir_prefix' in logger.results['platform']:
+            data_dir_prefix = logger.results['platform']['data_dir_prefix']
+        else:
+            data_dir_prefix = ''
+        print('data_dir_prefix,',data_dir_prefix)
+        npz_video_name = data_dir_prefix + video_name + '.npz'
+        if not os.path.exists(npz_video_name):
+            raise FileExistsError('no such npz', npz_video_name)
+        video_npy = np.load(npz_video_name)['a']
+        video_npy = video_npy / np.max(video_npy)
+        imgs = []
+        for frame_name in sorted(logger.results[video_name].keys(),key=lambda x:int(x)):
+            frame_id = int(frame_name)
+            if show_preds:
+                boxes = logger.results[video_name][frame_name]['boxes']
+            else:
+                boxes = []
+            if show_labels:
+                labels = logger.results[video_name][frame_name]['labels']
+            else:
+                labels = []
+            img_bb = paint_img_with_bb(video_npy[frame_id], boxes, labels, video_name + '_' + frame_name,
                                        min_display_conf, cls_names)
             imgs.append(img_bb)
     else:
@@ -149,7 +180,7 @@ def crop_dcm_img(dcm_img, path, dcm_scan_param_csv_file):
                            geo['right'] - geo['left'], geo['bottom'] - geo['top'])
 
 #save predicted image to server cache
-def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_path):
+def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_path,min_display_conf):
     img_src_dict = {}
     if not os.path.exists(dir_path+'/'+cache_dir+'/'+video_name):
         os.makedirs(dir_path+'/'+cache_dir+'/'+video_name)
@@ -160,9 +191,9 @@ def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_p
         img = dcm_cropped_imgs[fi]
         img_uint8 = (img / img_max_int * 255).astype(np.uint8)
         cv2.imwrite(dir_path+'/'+cache_filename, img_uint8)
-        imgs_uint8.append(img_uint8)
+        imgs_uint8.append(img_uint8[:,:,::-1])
         img_src_dict[frame_name] = cache_filename
-    gif_filename = dir_path + '/' + cache_dir + '/' + video_name + '/' + (video_name).replace('/', '_') + '.gif'
+    gif_filename = dir_path + '/' + cache_dir + '/' + video_name + '/' + (video_name).replace('/', '_') + '_'+str(min_display_conf)+'.gif'
     print('save gif', gif_filename)
     imageio.mimsave(gif_filename, imgs_uint8, fps=5)
     return img_src_dict
