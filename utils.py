@@ -7,7 +7,7 @@ import pandas as pd
 import imageio
 from matplotlib.colors import hsv_to_rgb
 
-def paint_img_with_bb(image ,boxes ,labels=[] ,title=None ,min_display_conf=0 ,cls_names=None):
+def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, cls_names=None, min_colormap=0):
     int_max =  1  # np.max(image)
     if len(image.shape) == 2:
         image = np.repeat(image[:, :, None], 3, axis=2)
@@ -18,7 +18,7 @@ def paint_img_with_bb(image ,boxes ,labels=[] ,title=None ,min_display_conf=0 ,c
     # include preditions
     for box in boxes:
         conf = box['conf']
-        if conf > min_display_conf:
+        if conf >= min_display_conf:
             paint_boxes.append(box)
 
     for box in paint_boxes:
@@ -31,7 +31,7 @@ def paint_img_with_bb(image ,boxes ,labels=[] ,title=None ,min_display_conf=0 ,c
             #blue to red color bar
             #edgecolor = [box['conf'] * int_max, 0, (1 - box['conf']) * int_max]
             #dark orange to bright orange
-            edgecolor = hsv_to_rgb([16/239,1,min(1,(max(0,box['conf']-min_display_conf))*2)]) * int_max
+            edgecolor = hsv_to_rgb([16/239,1,min(1,(max(0,box['conf']-min_colormap))*2)]) * int_max
             #pass BGR to cv2 color
             edgecolor = edgecolor[::-1]
             # edgecolor = colors[int(cls)]
@@ -90,15 +90,40 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
     return img_bb
 
 
-def get_ori_video(video_name, logger, show_labels=True, show_preds=True,
-                  min_display_conf=0, img_type='jpg', cls_names=None, dcm_scan_param_csv_file=None):
+def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_display_method='min_display_conf', 
+                    box_display_method_variable=0, img_type='jpg', cls_names=None, dcm_scan_param_csv_file=None):
     imgs = []
     frames = sorted(logger.results[video_name], key=lambda x: int(x))
+    if box_display_method == 'min_display_conf':
+        min_display_conf = box_display_method_variable
+    elif box_display_method == 'top_conf_frames_std':
+        top_confs = []
+        for frame_name in logger.results[video_name]:
+            if len(logger.results[video_name][frame_name]['boxes']):
+                top_confs.append(np.max([box['conf'] for box in logger.results[video_name][frame_name]['boxes']]))
+        if len(top_confs):
+            top_conf_std = np.std(top_confs)
+        else:
+            print('no box in prediction')
+            top_conf_std = 0
     if img_type == 'jpg':
         for frame_name in frames:
             frame_id = int(frame_name)
+            if box_display_method == 'top_N_frame_conf':
+                boxes = logger.results[video_name][frame_name]['boxes']
+                if box_display_method_variable>=len(boxes):
+                    min_display_conf = 0
+                else:
+                    min_display_conf = sorted([box['conf'] for box in boxes],reverse=True)[box_display_method_variable-1]
+            elif box_display_method == 'top_conf_frames_std':
+                if len(logger.results[video_name][frame_name]['boxes']):
+                    top_conf_frame = np.max([box['conf'] for box in logger.results[video_name][frame_name]['boxes']])
+                    min_display_conf = top_conf_frame - box_display_method_variable*top_conf_std
+                else:
+                    min_display_conf = 0
+
             img_bb = get_ori_frame(video_name, frame_id, logger, show_labels, show_preds, min_display_conf, img_type,
-                                   cls_names)
+                                   cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
             imgs.append(img_bb)
     elif img_type == 'dcm':
         data_dir_prefix = logger.results['platform']['data_dir_prefix']
@@ -117,18 +142,34 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True,
                 labels = logger.results[video_name][frame_name]['labels']
             else:
                 labels = []
+
+            if box_display_method == 'top_N_frame_conf':
+                if box_display_method_variable>=len(boxes):
+                    min_display_conf = 0
+                else:
+                    min_display_conf = sorted([box['conf'] for box in boxes],reverse=True)[box_display_method_variable-1]
+            elif box_display_method == 'top_conf_frames_std':
+                if len(logger.results[video_name][frame_name]['boxes']):
+                    top_conf_frame = np.max([box['conf'] for box in logger.results[video_name][frame_name]['boxes']])
+                    min_display_conf = top_conf_frame - box_display_method_variable*top_conf_std
+                else:
+                    min_display_conf = 0
+
             img_bb = paint_img_with_bb(dcm_cropped_imgs[frame_id], boxes, labels, video_name + '_' + frame_name,
-                                       min_display_conf, cls_names)
+                                       min_display_conf, cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
             imgs.append(img_bb)
     elif img_type == 'npz':
         if 'data_dir_prefix' in logger.results['platform']:
             data_dir_prefix = logger.results['platform']['data_dir_prefix']
         else:
             data_dir_prefix = ''
-        print('data_dir_prefix,',data_dir_prefix)
-        npz_video_name = data_dir_prefix + video_name + '.npz'
-        if not os.path.exists(npz_video_name):
-            raise FileExistsError('no such npz', npz_video_name)
+        if not os.path.exists(video_name + '.npz'):
+            npz_video_name = data_dir_prefix + video_name + '.npz'
+            if not os.path.exists(npz_video_name):
+                raise FileExistsError('no such npz', npz_video_name)
+        else:
+            npz_video_name = video_name + '.npz'
+
         video_npy = np.load(npz_video_name)['a']
         video_npy = video_npy / np.max(video_npy)
         imgs = []
@@ -142,8 +183,20 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True,
                 labels = logger.results[video_name][frame_name]['labels']
             else:
                 labels = []
+            if box_display_method == 'top_N_frame_conf':
+                if box_display_method_variable>=len(boxes):
+                    min_display_conf = 0
+                else:
+                    min_display_conf = sorted([box['conf'] for box in boxes],reverse=True)[box_display_method_variable-1]
+            elif box_display_method == 'top_conf_frames_std':
+                if len(logger.results[video_name][frame_name]['boxes']):
+                    top_conf_frame = np.max([box['conf'] for box in logger.results[video_name][frame_name]['boxes']])
+                    min_display_conf = top_conf_frame - box_display_method_variable*top_conf_std
+                else:
+                    min_display_conf = 0
+
             img_bb = paint_img_with_bb(video_npy[frame_id], boxes, labels, video_name + '_' + frame_name,
-                                       min_display_conf, cls_names)
+                                       min_display_conf, cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
             imgs.append(img_bb)
     else:
         raise ValueError('undefined')
@@ -180,20 +233,21 @@ def crop_dcm_img(dcm_img, path, dcm_scan_param_csv_file):
                            geo['right'] - geo['left'], geo['bottom'] - geo['top'])
 
 #save predicted image to server cache
-def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_path,min_display_conf):
+def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_path,box_display_method,box_display_method_variable):
     img_src_dict = {}
-    if not os.path.exists(dir_path+'/'+cache_dir+'/'+video_name):
-        os.makedirs(dir_path+'/'+cache_dir+'/'+video_name)
+    current_video_cache_path = cache_dir + '/' + video_name + '/' + box_display_method + '/%.3f'%(box_display_method_variable)
+    if not os.path.exists(dir_path+'/'+current_video_cache_path):
+        os.makedirs(dir_path+'/'+current_video_cache_path)
     img_max_int = np.max(dcm_cropped_imgs)
     imgs_uint8 = []
     for fi, frame_name in enumerate(frame_names):
-        cache_filename = cache_dir+'/'+video_name+'/'+frame_name+'.jpg'
+        cache_filename = current_video_cache_path+'/'+frame_name+'.jpg'
         img = dcm_cropped_imgs[fi]
         img_uint8 = (img / img_max_int * 255).astype(np.uint8)
         cv2.imwrite(dir_path+'/'+cache_filename, img_uint8)
         imgs_uint8.append(img_uint8[:,:,::-1])
         img_src_dict[frame_name] = cache_filename
-    gif_filename = dir_path + '/' + cache_dir + '/' + video_name + '/' + (video_name).replace('/', '_') + '_'+str(min_display_conf)+'.gif'
+    gif_filename = dir_path+'/'+current_video_cache_path + '/' + (video_name).replace('/', '_') + '.gif'
     print('save gif', gif_filename)
     imageio.mimsave(gif_filename, imgs_uint8, fps=5)
     return img_src_dict

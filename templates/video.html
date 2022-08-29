@@ -36,19 +36,35 @@
     </style>
 </head>
 <body>
-<p class="test_file">/local/home/li/yolov5/runs/train/exp97/test_video/test_video_ori_coord_log_2022-04-13_180008.json</p>
-<p class="test_file">/local/home/li/yolov5/runs/train/exp111/val_video/val_video_ori_coord_log_2022-04-13_022129.json</p>
+Combined CON <p class="test_file">/local/home/li/yolov5/runs/train/exp340/test_video/test_video_ori_coord_log_2022-06-23_172949.json</p>
+Combined CON CON+SPC<p class="test_file">/local/home/li/yolov5/runs/train/exp411/val_video/test_video_ori_coord_log_2022-08-22_222655.json</p>
+
 
 <label for="logger_file">Path to AIlogger file:</label>
 <input type="text" id="logger_file" name="logger_file" value="{{logger_file}}" style="width: 800px;"></br>
 
+
+<input type="radio" id="min_display_conf_radio" name="box_sel" value="min_display_conf" checked="checked">
 <label for="min_display_conf">Min display conf:</label>
-<input type="text" id="min_display_conf" name="min_display_conf" value="0.1"></br>
+<input type="text" id="min_display_conf" name="min_display_conf" value="0.1" style="width: 30px;">
+
+<input type="radio" id="top_N_frame_conf_radio" name="box_sel" value="top_N_frame_conf">
+<label for="top_N_frame_conf">Top N box per frame:</label>
+<input type="text" id="top_N_frame_conf" name="top_N_frame_conf" value="1" style="width: 30px;">
+
+<input type="radio" id="top_conf_frames_std_radio" name="box_sel" value="top_conf_frames_std">
+<label for="top_conf_frames_std">N STD below top conf box from each frame:</label>
+<input type="text" id="top_conf_frames_std" name="top_conf_frames_std" value="1" style="width: 30px;">
+</br>
+
 
 <label for="frame_name">Frame name:</label>
 <button id="frame_down"> - </button>
 <input type="text" id="frame_name" name="frame_name" value="0">
 <button id="frame_up"> + </button>
+</br>
+<button id="clear_cache"> Clear Cache </button>
+
 
 <div class="aParent">
     <div id="div_video_list">
@@ -118,9 +134,10 @@ $(function() {
         //clear highlight for last selected video
         $(".selected_video").removeClass("selected_video");
         var video_name = $(this).attr("video_name")
-        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&min_display_conf="+$("#min_display_conf").val())
+        var sel_disp_method = $('input[name=box_sel]:checked').val()
+        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val())
         $.ajax({
-            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&min_display_conf="+$("#min_display_conf").val(),
+            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val(),
             method: "GET",
             success: function (response) {
                 response_a = response
@@ -141,11 +158,22 @@ $(function() {
                     //highlight selected video name in the list
                     $(".video_name_span[video_name='"+video_name+"']").addClass("selected_video");
                     //add link to gif download
-                    $("#gif_link").attr("href","/static/cache_imgs/"+video_name+'/'+video_name.replaceAll("/","_")+"_"+$("#min_display_conf").val()+".gif");
+                    $("#gif_link").attr("href","/static/cache_imgs/"+video_name+'/'+sel_disp_method+'/'+parseFloat($("#"+sel_disp_method).val()).toFixed(3)+'/'+video_name.replaceAll("/","_")+".gif");
                 }
                 else{
-                    console.log("load_video failed")
+                    console.log("load_video failed");
                 }
+            }
+        })
+    });
+
+    $(document).on("click", "#clear_cache", function() {
+        $.ajax({
+            url: "/clear_cache",
+            method: "GET",
+            success: function (response) {
+                $(".selected_video").removeClass("selected_video");
+                console.log("load_video failed");
             }
         })
     });

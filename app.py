@@ -48,23 +48,36 @@ def load_video():
 	video_name = request.args['video_name']
 	if app.logger is None or video_name not in list(app.logger.results.keys())[3:]:
 		return {'err':video_name+' video name not in this logger'}
+	box_display_method = None
 	if 'min_display_conf' in request.args:
-		min_display_conf = float(request.args['min_display_conf'])
+		box_display_method = 'min_display_conf'
+		box_display_method_variable = float(request.args['min_display_conf'])
+	elif 'top_N_frame_conf' in request.args:
+		box_display_method = 'top_N_frame_conf'
+		box_display_method_variable = int(request.args['top_N_frame_conf'])
+	elif 'top_conf_frames_std' in request.args:
+		box_display_method = 'top_conf_frames_std'
+		box_display_method_variable = int(request.args['top_conf_frames_std'])
 	else:
-		min_display_conf = 0.1
+		box_display_method = 'min_display_conf'
+		box_display_method_variable = 0.1
 	frame_names = sorted(app.logger.results[video_name].keys(),key=lambda x:int(x))
 	
 	#test whether gif exists
 	dir_path = os.path.dirname(os.path.realpath(__file__))
 	cache_dir = 'static/cache_imgs'
-	gif_filename = dir_path + '/' + cache_dir + '/' + video_name + '/' + (video_name).replace('/', '_') + '_'+str(min_display_conf)+'.gif'
+	current_video_cache_path = cache_dir + '/' + video_name + '/' + box_display_method + '/%.3f'%(box_display_method_variable)
+	gif_filename =  dir_path + '/' + current_video_cache_path + '/' + (video_name).replace('/', '_') + '.gif'
+
+	#with open('video_checker_log.txt','w') as fp:
+	#	fp.write(box_display_method+' '+str(box_display_method_variable))
 
 	if os.path.exists(gif_filename):
 		print('found cache',gif_filename)
 		#construct img_src_dict by image
 		img_src_dict = {}
 		for fi, frame_name in enumerate(frame_names):
-			cache_filename = cache_dir+'/'+video_name+'/'+frame_name+'.jpg'
+			cache_filename = current_video_cache_path+'/'+frame_name+'.jpg'
 			if os.path.exists(dir_path+'/'+cache_filename):
 				img_src_dict[frame_name] = cache_filename
 	else:
@@ -75,14 +88,15 @@ def load_video():
 			data_dir_prefix = ''
 		#dcm_scan_param_csv_file = '/home/pj-019468-si/BARDA_ID/Code/barda_lus/blines/image_proc_algorithm/Read_params_from_DICOMS/output/medstar_dicom_scan_params_updated.csv'
 		dcm_scan_param_csv_file = '/home/pj-019468-si/radhika/DICOM_details_Medstar.csv'
-		if os.path.exists(data_dir_prefix + video_name + '.npz'):
-			painted_imgs = get_ori_video(video_name, app.logger, min_display_conf=min_display_conf,
+
+		if os.path.exists(data_dir_prefix + video_name + '.npz') or os.path.exists(video_name + '.npz'):
+			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
 										 img_type='npz', cls_names=['Con', 'SPC', 'PE', 'AT'])
 		else:
-			painted_imgs = get_ori_video(video_name, app.logger, min_display_conf=min_display_conf,
+			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
 										 img_type='jpg', cls_names=['Con','SPC','PE','AT'],
 										 dcm_scan_param_csv_file=dcm_scan_param_csv_file)
-		img_src_dict = cache_display_images(painted_imgs,video_name,frame_names,cache_dir,dir_path,min_display_conf)
+		img_src_dict = cache_display_images(painted_imgs,video_name,frame_names,cache_dir,dir_path,box_display_method,box_display_method_variable)
 	return {'img_src_dict': img_src_dict}
 
 
