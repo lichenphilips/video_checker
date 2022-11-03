@@ -73,7 +73,7 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
                 '/consolidation_area', '/no_consolidation_area')
             if not os.path.exists(img_filename):
                 print('img_filename not exist', img_filename)
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), img_filename)
+                raise FileNotFoundError(img_filename)
         img = cv2.imread(img_filename)
         img = img / np.max(img)
     else:
@@ -83,7 +83,7 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
     else:
         boxes = []
     if show_labels:
-        labels = logger.results[video_name][frame_name]['labels']
+        labels = logger.results[video_name][frame_name]['labels'] if 'labels' in logger.results[video_name][frame_name] else []
     else:
         labels = []
     img_bb = paint_img_with_bb(img, boxes, labels, video_name + '_' + frame_name, min_display_conf, cls_names)
@@ -123,55 +123,46 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
                     min_display_conf = 0
 
             img_bb = get_ori_frame(video_name, frame_id, logger, show_labels, show_preds, min_display_conf, img_type,
-                                   cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
+                                   cls_names)
             imgs.append(img_bb)
-    elif img_type == 'dcm':
-        data_dir_prefix = logger.results['platform']['data_dir_prefix']
-        img_filename = data_dir_prefix + video_name + '.dcm'
-        dcm_img = pydicom.read_file(img_filename).pixel_array[:, :, :, 0]
-        dcm_cropped_imgs, img_offset = crop_dcm_img(dcm_img, video_name + '.dcm', dcm_scan_param_csv_file)
-        dcm_cropped_imgs = dcm_cropped_imgs / np.max(dcm_cropped_imgs)
-        imgs = []
-        for frame_name in sorted(logger.results[video_name].keys(),key=lambda x:int(x)):
-            frame_id = int(frame_name)
-            if show_preds:
-                boxes = logger.results[video_name][frame_name]['boxes']
-            else:
-                boxes = []
-            if show_labels:
-                labels = logger.results[video_name][frame_name]['labels']
-            else:
-                labels = []
-
-            if box_display_method == 'top_N_frame_conf':
-                if box_display_method_variable>=len(boxes):
-                    min_display_conf = 0
-                else:
-                    min_display_conf = sorted([box['conf'] for box in boxes],reverse=True)[box_display_method_variable-1]
-            elif box_display_method == 'top_conf_frames_std':
-                if len(logger.results[video_name][frame_name]['boxes']):
-                    top_conf_frame = np.max([box['conf'] for box in logger.results[video_name][frame_name]['boxes']])
-                    min_display_conf = top_conf_frame - box_display_method_variable*top_conf_std
-                else:
-                    min_display_conf = 0
-
-            img_bb = paint_img_with_bb(dcm_cropped_imgs[frame_id], boxes, labels, video_name + '_' + frame_name,
-                                       min_display_conf, cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
-            imgs.append(img_bb)
-    elif img_type == 'npz':
-        if 'data_dir_prefix' in logger.results['platform']:
+    else:
+        if img_type == 'dcm':
             data_dir_prefix = logger.results['platform']['data_dir_prefix']
-        else:
-            data_dir_prefix = ''
-        if not os.path.exists(video_name + '.npz'):
-            npz_video_name = data_dir_prefix + video_name + '.npz'
-            if not os.path.exists(npz_video_name):
-                raise FileExistsError('no such npz', npz_video_name)
-        else:
-            npz_video_name = video_name + '.npz'
+            img_filename = data_dir_prefix + video_name + '.dcm'
+            dcm_img = pydicom.read_file(img_filename).pixel_array[:, :, :, 0]
+            dcm_cropped_imgs, img_offset = crop_dcm_img(dcm_img, video_name + '.dcm', dcm_scan_param_csv_file)
+            video_npy = dcm_cropped_imgs / np.max(dcm_cropped_imgs)
+            
+        elif img_type == 'npz':
+            if 'data_dir_prefix' in logger.results['platform']:
+                data_dir_prefix = logger.results['platform']['data_dir_prefix']
+            else:
+                data_dir_prefix = ''
+            if not os.path.exists(video_name + '.npz'):
+                npz_video_name = data_dir_prefix + video_name + '.npz'
+                if not os.path.exists(npz_video_name):
+                    raise FileExistsError('no such npz', npz_video_name)
+            else:
+                npz_video_name = video_name + '.npz'
+            video_npy = np.load(npz_video_name)['a']
+            video_npy = video_npy / np.max(video_npy)
 
-        video_npy = np.load(npz_video_name)['a']
-        video_npy = video_npy / np.max(video_npy)
+        elif img_type == 'dcm_npz':
+            if 'data_dir_prefix' in logger.results['platform']:
+                data_dir_prefix = logger.results['platform']['data_dir_prefix']
+            else:
+                data_dir_prefix = ''
+            if not os.path.exists(video_name + '.dcm.cropped.npz'):
+                npz_video_name = data_dir_prefix + video_name + '.dcm.cropped.npz'
+                if not os.path.exists(npz_video_name):
+                    raise FileExistsError('no such npz', npz_video_name)
+            else:
+                npz_video_name = video_name + '.dcm.cropped.npz'
+            video_npy = np.load(npz_video_name)['a']
+            video_npy = video_npy / np.max(video_npy)
+        else:
+            raise ValueError('undefined')    
+
         imgs = []
         for frame_name in sorted(logger.results[video_name].keys(),key=lambda x:int(x)):
             frame_id = int(frame_name)
@@ -180,7 +171,7 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
             else:
                 boxes = []
             if show_labels:
-                labels = logger.results[video_name][frame_name]['labels']
+                labels = logger.results[video_name][frame_name]['labels'] if 'labels' in logger.results[video_name][frame_name] else []
             else:
                 labels = []
             if box_display_method == 'top_N_frame_conf':
@@ -198,8 +189,7 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
             img_bb = paint_img_with_bb(video_npy[frame_id], boxes, labels, video_name + '_' + frame_name,
                                        min_display_conf, cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
             imgs.append(img_bb)
-    else:
-        raise ValueError('undefined')
+    
     return imgs
 
 # remove unnecessary info outside scan region. Use dcm_scan_param_csv to locate boundary

@@ -36,9 +36,10 @@
     </style>
 </head>
 <body>
-Combined CON <p class="test_file">/local/home/li/yolov5/runs/train/exp340/test_video/test_video_ori_coord_log_2022-06-23_172949.json</p>
-Combined CON CON+SPC<p class="test_file">/local/home/li/yolov5/runs/train/exp411/val_video/test_video_ori_coord_log_2022-08-22_222655.json</p>
-
+Combined CON <span class="test_file">/local/home/li/yolov5/runs/train/exp340/test_video/test_video_ori_coord_log_2022-06-23_172949.json</span> <br/>
+Combined CON CON+SPC <span class="test_file">/local/home/li/yolov5/runs/train/exp411/val_video/test_video_ori_coord_log_2022-08-22_222655.json</span> <br/>
+GHL on Medstar <span class="test_file">/local/home/li/yolov5/runs/val/medstar_test_con/medstar_test_con_ori_coord_log_2022-07-25_160448.json</span> <br/> 
+GHL on Yale <span class="test_file">/local/home/li/yolov5/runs/val/yale_test_con/yale_test_con_ori_coord_log_2022-08-11_185926.json</span> <br/>
 
 <label for="logger_file">Path to AIlogger file:</label>
 <input type="text" id="logger_file" name="logger_file" value="{{logger_file}}" style="width: 800px;"></br>
@@ -70,7 +71,7 @@ Combined CON CON+SPC<p class="test_file">/local/home/li/yolov5/runs/train/exp411
     <div id="div_video_list">
         <ul id="ul_video_list">
         {% for i in logger_profile %}
-            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames)</span></a></li>
+            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames  {{i.label_num}} annotations)</span></a></li>
 		{% endfor %}
         </ul>
     </div>
@@ -113,7 +114,8 @@ $(function() {
                                 $('<a>').append(
                                     $('<span>').attr('class', 'video_name_span')
                                     .attr('video_name', video_obj['video_name']).append(video_obj['video_name']+
-                                        ' ('+video_obj['frame_num']+' frames)')
+                                        ' ('+video_obj['frame_num']+' frames)'+
+                                        ' ('+video_obj['label_num']+' annotations)')
                                 )
                             )
                         )

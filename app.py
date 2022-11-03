@@ -24,6 +24,7 @@ def get_video_list():
 	if logfile_name == '':
 		return {'logger_profile': []}
 	if os.path.exists(logfile_name):
+		clear_cache()
 		return generate_video_list(logfile_name)
 	else:
 		return {'err': 'no such file'}
@@ -37,7 +38,7 @@ def generate_video_list(logfile_name):
 	for video_name in video_list:
 		frames = app.logger.results[video_name].keys()
 		frame_num = len(frames)
-		label_num = sum([len(app.logger.results[video_name][frame]['labels']) for frame in frames])
+		label_num = sum([len(app.logger.results[video_name][frame]['labels']) for frame in frames if 'labels' in app.logger.results[video_name][frame]])
 		pred_num = sum([len(app.logger.results[video_name][frame]['boxes']) for frame in frames])
 		ret_dict.append({'video_name': video_name, 'frame_num': frame_num,
 						 'label_num': label_num, 'pred_num': pred_num})
@@ -86,15 +87,22 @@ def load_video():
 			data_dir_prefix = app.logger.results['platform']['data_dir_prefix']
 		else:
 			data_dir_prefix = ''
+		if 'class_names' in app.logger.results['platform']:
+			cls_names = app.logger.results['platform']['class_names']
+		else:
+			cls_names = ['Con', 'SPC', 'PE', 'AT']
 		#dcm_scan_param_csv_file = '/home/pj-019468-si/BARDA_ID/Code/barda_lus/blines/image_proc_algorithm/Read_params_from_DICOMS/output/medstar_dicom_scan_params_updated.csv'
 		dcm_scan_param_csv_file = '/home/pj-019468-si/radhika/DICOM_details_Medstar.csv'
 
 		if os.path.exists(data_dir_prefix + video_name + '.npz') or os.path.exists(video_name + '.npz'):
 			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
-										 img_type='npz', cls_names=['Con', 'SPC', 'PE', 'AT'])
+										 img_type='npz', cls_names=cls_names)
+		elif os.path.exists(data_dir_prefix + video_name + '.dcm.cropped.npz') or os.path.exists(video_name + '.dcm.cropped.npz'):
+			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
+										 img_type='dcm_npz', cls_names=cls_names)
 		else:
 			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
-										 img_type='jpg', cls_names=['Con','SPC','PE','AT'],
+										 img_type='jpg', cls_names=cls_names,
 										 dcm_scan_param_csv_file=dcm_scan_param_csv_file)
 		img_src_dict = cache_display_images(painted_imgs,video_name,frame_names,cache_dir,dir_path,box_display_method,box_display_method_variable)
 	return {'img_src_dict': img_src_dict}
