@@ -144,7 +144,13 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
                     raise FileExistsError('no such npz', npz_video_name)
             else:
                 npz_video_name = video_name + '.npz'
-            video_npy = np.load(npz_video_name)['a']
+            video_npy_dict = dict(np.load(npz_video_name,allow_pickle=True))
+            if 'a' in video_npy_dict:
+                video_npy = video_npy_dict['a']
+            elif 'cropped_video' in video_npy_dict:
+                video_npy = video_npy_dict['cropped_video']
+            else:
+                raise ValueError('no dict')
             video_npy = video_npy / np.max(video_npy)
 
         elif img_type == 'dcm_npz':
@@ -158,7 +164,13 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
                     raise FileExistsError('no such npz', npz_video_name)
             else:
                 npz_video_name = video_name + '.dcm.cropped.npz'
-            video_npy = np.load(npz_video_name)['a']
+            video_npy_dict = dict(np.load(npz_video_name,allow_pickle=True))
+            if 'a' in video_npy_dict:
+                video_npy = video_npy_dict['a']
+            elif 'cropped_video' in video_npy_dict:
+                video_npy = video_npy_dict['cropped_video']
+            else:
+                raise ValueError('no dict')
             video_npy = video_npy / np.max(video_npy)
         else:
             raise ValueError('undefined')    
