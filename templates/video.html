@@ -74,7 +74,7 @@ GHL on Yale <span class="test_file">/local/home/li/yolov5/runs/val/yale_test_con
     <div id="div_video_list">
         <ul id="ul_video_list">
         {% for i in logger_profile %}
-            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames  {{i.pred_num}} annotations)  {{i.box_num}} predictions)</span></a></li>
+            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames  {{i.label_num}} annotations  {{i.pred_num}} predictions)</span></a></li>
 		{% endfor %}
         </ul>
     </div>
