@@ -63,6 +63,9 @@ GHL on Yale <span class="test_file">/local/home/li/yolov5/runs/val/yale_test_con
 <button id="frame_down"> - </button>
 <input type="text" id="frame_name" name="frame_name" value="0">
 <button id="frame_up"> + </button>
+
+<label for="display_frame_name">Display video name:</label>
+<input type="checkbox" id="display_frame_name" name="display_frame_name">
 </br>
 <button id="clear_cache"> Clear Cache </button>
 
@@ -71,7 +74,7 @@ GHL on Yale <span class="test_file">/local/home/li/yolov5/runs/val/yale_test_con
     <div id="div_video_list">
         <ul id="ul_video_list">
         {% for i in logger_profile %}
-            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames  {{i.label_num}} annotations)</span></a></li>
+            <li><a><span class="video_name_span" video_name="{{i.video_name}}">{{i.video_name}} ({{i.frame_num}} frames  {{i.pred_num}} annotations)  {{i.box_num}} predictions)</span></a></li>
 		{% endfor %}
         </ul>
     </div>
@@ -115,7 +118,8 @@ $(function() {
                                     $('<span>').attr('class', 'video_name_span')
                                     .attr('video_name', video_obj['video_name']).append(video_obj['video_name']+
                                         ' ('+video_obj['frame_num']+' frames)'+
-                                        ' ('+video_obj['label_num']+' annotations)')
+                                        ' ('+video_obj['label_num']+' annotations)'+
+                                        ' ('+video_obj['pred_num']+' predictions)')
                                 )
                             )
                         )
@@ -137,9 +141,9 @@ $(function() {
         $(".selected_video").removeClass("selected_video");
         var video_name = $(this).attr("video_name")
         var sel_disp_method = $('input[name=box_sel]:checked').val()
-        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val())
+        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val()+"&disp_name="+$("#display_frame_name").is(':checked'))
         $.ajax({
-            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val(),
+            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val()+"&disp_name="+$("#display_frame_name").is(':checked'),
             method: "GET",
             success: function (response) {
                 response_a = response

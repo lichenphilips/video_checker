@@ -62,6 +62,15 @@ def load_video():
 	else:
 		box_display_method = 'min_display_conf'
 		box_display_method_variable = 0.1
+	if 'disp_name' in request.args:
+		disp_name = request.args['disp_name']
+		if disp_name=='false':
+			disp_name = False
+		else:
+			disp_name = True
+	else:
+		disp_name = True
+
 	frame_names = sorted(app.logger.results[video_name].keys(),key=lambda x:int(x))
 	
 	#test whether gif exists
@@ -95,15 +104,14 @@ def load_video():
 		dcm_scan_param_csv_file = '/home/pj-019468-si/radhika/DICOM_details_Medstar.csv'
 
 		if os.path.exists(data_dir_prefix + video_name + '.npz') or os.path.exists(video_name + '.npz'):
-			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
-										 img_type='npz', cls_names=cls_names)
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names)
+		elif os.path.exists(data_dir_prefix + video_name + '.mp4.cropped.npz') or os.path.exists(video_name + '.mp4.cropped.npz'):
+			video_name = video_name
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names)
 		elif os.path.exists(data_dir_prefix + video_name + '.dcm.cropped.npz') or os.path.exists(video_name + '.dcm.cropped.npz'):
-			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
-										 img_type='dcm_npz', cls_names=cls_names)
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='dcm_npz', cls_names=cls_names)
 		else:
-			painted_imgs = get_ori_video(video_name, app.logger, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable,
-										 img_type='jpg', cls_names=cls_names,
-										 dcm_scan_param_csv_file=dcm_scan_param_csv_file)
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='jpg', cls_names=cls_names, dcm_scan_param_csv_file=dcm_scan_param_csv_file)
 		img_src_dict = cache_display_images(painted_imgs,video_name,frame_names,cache_dir,dir_path,box_display_method,box_display_method_variable)
 	return {'img_src_dict': img_src_dict}
 

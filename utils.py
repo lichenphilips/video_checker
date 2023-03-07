@@ -62,7 +62,7 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
 
     return image
 
-def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=True,
+def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=True, show_frame_name=True,
                   min_display_conf=0, img_type='jpg', cls_names=None):
     data_dir_prefix = logger.results['platform']['data_dir_prefix']
     frame_name = '%d' % (frame_id)
@@ -86,11 +86,15 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
         labels = logger.results[video_name][frame_name]['labels'] if 'labels' in logger.results[video_name][frame_name] else []
     else:
         labels = []
-    img_bb = paint_img_with_bb(img, boxes, labels, video_name + '_' + frame_name, min_display_conf, cls_names)
+    if show_frame_name:
+        text_name = video_name + '_' + frame_name
+    else:
+        text_name = ''
+    img_bb = paint_img_with_bb(img, boxes, labels, text_name, min_display_conf, cls_names)
     return img_bb
 
 
-def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_display_method='min_display_conf', 
+def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_frame_name=True, box_display_method='min_display_conf', 
                     box_display_method_variable=0, img_type='jpg', cls_names=None, dcm_scan_param_csv_file=None):
     imgs = []
     frames = sorted(logger.results[video_name], key=lambda x: int(x))
@@ -122,7 +126,7 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
                 else:
                     min_display_conf = 0
 
-            img_bb = get_ori_frame(video_name, frame_id, logger, show_labels, show_preds, min_display_conf, img_type,
+            img_bb = get_ori_frame(video_name, frame_id, logger, show_labels, show_preds, show_frame_name, min_display_conf, img_type,
                                    cls_names)
             imgs.append(img_bb)
     else:
@@ -141,7 +145,11 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
             if not os.path.exists(video_name + '.npz'):
                 npz_video_name = data_dir_prefix + video_name + '.npz'
                 if not os.path.exists(npz_video_name):
-                    raise FileExistsError('no such npz', npz_video_name)
+                    npz_video_name = video_name + '.mp4.cropped.npz'
+                    if not os.path.exists(npz_video_name):
+                        npz_video_name = data_dir_prefix + video_name + '.mp4.cropped.npz'
+                        if not os.path.exists(npz_video_name):
+                           raise FileExistsError('no such npz', npz_video_name)
             else:
                 npz_video_name = video_name + '.npz'
             video_npy_dict = dict(np.load(npz_video_name,allow_pickle=True))
@@ -198,7 +206,11 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, box_dis
                 else:
                     min_display_conf = 0
 
-            img_bb = paint_img_with_bb(video_npy[frame_id], boxes, labels, video_name + '_' + frame_name,
+            if show_frame_name:
+                text_name = video_name + '_' + frame_name
+            else:
+                text_name = ''
+            img_bb = paint_img_with_bb(video_npy[frame_id], boxes, labels, text_name,
                                        min_display_conf, cls_names, min_display_conf if box_display_method == 'min_display_conf' else 0)
             imgs.append(img_bb)
     
