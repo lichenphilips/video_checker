@@ -1,8 +1,9 @@
 import flask
 from flask import Flask, request, render_template
-from utils import get_ori_video, cache_display_images
+from utils import get_ori_video, cache_display_images, frame_ignore_list
 from logger_utils import AILogger
 import os
+import glob
 import shutil
 
 app = Flask(__name__)
@@ -33,10 +34,10 @@ def generate_video_list(logfile_name):
 	app.logger = AILogger(logfile_name)
 	app.logger.load(logfile_name)
 	print('load from', logfile_name)
-	video_list = list(app.logger.results.keys())[3:]
+	video_list = [k for k in list(app.logger.results.keys()) if k not in ['creation_date_time','platform','program','cascade']]
 	ret_dict = []
 	for video_name in video_list:
-		frames = app.logger.results[video_name].keys()
+		frames = [k for k in app.logger.results[video_name].keys() if k not in frame_ignore_list]
 		frame_num = len(frames)
 		label_num = sum([len(app.logger.results[video_name][frame]['labels']) for frame in frames if 'labels' in app.logger.results[video_name][frame]])
 		pred_num = sum([len(app.logger.results[video_name][frame]['boxes']) for frame in frames])
@@ -47,7 +48,10 @@ def generate_video_list(logfile_name):
 @app.route("/load_video", methods=['GET'])
 def load_video():
 	video_name = request.args['video_name']
-	if app.logger is None or video_name not in list(app.logger.results.keys())[3:]:
+	if app.logger is None:
+		return {'err':video_name+' video name not in this logger'}
+	video_list = [k for k in list(app.logger.results.keys()) if k not in ['creation_date_time','platform','program','cascade']]
+	if video_name not in video_list:
 		return {'err':video_name+' video name not in this logger'}
 	box_display_method = None
 	if 'min_display_conf' in request.args:
@@ -71,8 +75,7 @@ def load_video():
 	else:
 		disp_name = True
 
-	frame_names = sorted(app.logger.results[video_name].keys(),key=lambda x:int(x))
-	
+	#frame_names = sorted([k for k in app.logger.results[video_name].keys() if k not in frame_ignore_list],key=lambda x:int(x))
 	#test whether gif exists
 	dir_path = os.path.dirname(os.path.realpath(__file__))
 	cache_dir = 'static/cache_imgs'
@@ -86,6 +89,7 @@ def load_video():
 		print('found cache',gif_filename)
 		#construct img_src_dict by image
 		img_src_dict = {}
+		frame_names = [str(i) for i in range(len(glob.glob(dir_path + '/' + current_video_cache_path+'/*.jpg')))]
 		for fi, frame_name in enumerate(frame_names):
 			cache_filename = current_video_cache_path+'/'+frame_name+'.jpg'
 			if os.path.exists(dir_path+'/'+cache_filename):
@@ -110,8 +114,10 @@ def load_video():
 			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names)
 		elif os.path.exists(data_dir_prefix + video_name + '.dcm.cropped.npz') or os.path.exists(video_name + '.dcm.cropped.npz'):
 			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='dcm_npz', cls_names=cls_names)
+			return 'create 3cache'
 		else:
 			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='jpg', cls_names=cls_names, dcm_scan_param_csv_file=dcm_scan_param_csv_file)
+		frame_names = [str(i) for i in range(len(painted_imgs))]
 		img_src_dict = cache_display_images(painted_imgs,video_name,frame_names,cache_dir,dir_path,box_display_method,box_display_method_variable)
 	return {'img_src_dict': img_src_dict}
 

@@ -6,6 +6,7 @@ import pydicom
 import pandas as pd
 import imageio
 from matplotlib.colors import hsv_to_rgb
+frame_ignore_list = ["depth","pix_per_cm","number_of_frames","cropping_start_point_row_col","cropping_width_height"]
 
 def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, cls_names=None, min_colormap=0):
     int_max =  1  # np.max(image)
@@ -97,7 +98,7 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
 def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_frame_name=True, box_display_method='min_display_conf', 
                     box_display_method_variable=0, img_type='jpg', cls_names=None, dcm_scan_param_csv_file=None):
     imgs = []
-    frames = sorted(logger.results[video_name], key=lambda x: int(x))
+    frames = sorted([k for k in logger.results[video_name].keys() if k not in frame_ignore_list], key=lambda x: int(x))
     if box_display_method == 'min_display_conf':
         min_display_conf = box_display_method_variable
     elif box_display_method == 'top_conf_frames_std':
@@ -152,7 +153,7 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_fr
                            raise FileExistsError('no such npz', npz_video_name)
             else:
                 npz_video_name = video_name + '.npz'
-            video_npy_dict = dict(np.load(npz_video_name,allow_pickle=True))
+            video_npy_dict = np.load(npz_video_name,allow_pickle=True)
             if 'a' in video_npy_dict:
                 video_npy = video_npy_dict['a']
             elif 'cropped_video' in video_npy_dict:
@@ -172,7 +173,7 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_fr
                     raise FileExistsError('no such npz', npz_video_name)
             else:
                 npz_video_name = video_name + '.dcm.cropped.npz'
-            video_npy_dict = dict(np.load(npz_video_name,allow_pickle=True))
+            video_npy_dict = np.load(npz_video_name,allow_pickle=True)
             if 'a' in video_npy_dict:
                 video_npy = video_npy_dict['a']
             elif 'cropped_video' in video_npy_dict:
@@ -184,13 +185,15 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_fr
             raise ValueError('undefined')    
 
         imgs = []
-        for frame_name in sorted(logger.results[video_name].keys(),key=lambda x:int(x)):
-            frame_id = int(frame_name)
-            if show_preds:
+        #for frame_name in sorted([k for k in logger.results[video_name].keys() if k not in frame_ignore_list],key=lambda x:int(x)):
+        for frame_id in range(video_npy.shape[0]):
+            #frame_id = int(frame_name)
+            frame_name = str(frame_id)
+            if show_preds and frame_name in logger.results[video_name] and 'boxes' in logger.results[video_name][frame_name]:
                 boxes = logger.results[video_name][frame_name]['boxes']
             else:
                 boxes = []
-            if show_labels:
+            if show_labels and frame_name in logger.results[video_name]:
                 labels = logger.results[video_name][frame_name]['labels'] if 'labels' in logger.results[video_name][frame_name] else []
             else:
                 labels = []
