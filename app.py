@@ -114,7 +114,6 @@ def load_video():
 			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names)
 		elif os.path.exists(data_dir_prefix + video_name + '.dcm.cropped.npz') or os.path.exists(video_name + '.dcm.cropped.npz'):
 			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='dcm_npz', cls_names=cls_names)
-			return 'create 3cache'
 		else:
 			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='jpg', cls_names=cls_names, dcm_scan_param_csv_file=dcm_scan_param_csv_file)
 		frame_names = [str(i) for i in range(len(painted_imgs))]
