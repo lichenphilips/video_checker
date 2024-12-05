@@ -12,7 +12,7 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
     int_max =  1  # np.max(image)
     if len(image.shape) == 2:
         image = np.repeat(image[:, :, None], 3, axis=2)
-
+    #test
     linewidth = 2
     # include ground truth labels
     paint_boxes = copy.deepcopy(labels)
