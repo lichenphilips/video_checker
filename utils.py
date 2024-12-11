@@ -7,7 +7,9 @@ import pandas as pd
 import imageio
 from matplotlib.colors import hsv_to_rgb
 frame_ignore_list = ["depth","pix_per_cm","number_of_frames","cropping_start_point_row_col","cropping_width_height"]
-
+#import matplotlib
+#matplotlib.use('TkAgg')
+#from matplotlib import pyplot as plt
 def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, cls_names=None, min_colormap=0):
     int_max =  1  # np.max(image)
     if len(image.shape) == 2:
@@ -16,7 +18,7 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
     linewidth = 2
     # include ground truth labels
     paint_boxes = copy.deepcopy(labels)
-    # include preditions
+    # include preditions based on min_display_conf
     for box in boxes:
         conf = box['conf']
         if conf >= min_display_conf:
@@ -37,16 +39,26 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
             edgecolor = edgecolor[::-1]
             # edgecolor = colors[int(cls)]
 
-        start_point = (int(round(labels_xyxy[0])), int(round(labels_xyxy[1])))
+        start_point = (int(round(labels_xyxy[0])-2), int(round(labels_xyxy[1]))) # the 2 is to add some space so that the text is not on the box
         end_point = (int(round(labels_xyxy[2])), int(round(labels_xyxy[3])))
+        bot_right_point = (int(round(labels_xyxy[0])), int(round(labels_xyxy[3]))+10) # the 5 is to account for the height of the text
+
         image = cv2.rectangle(image, start_point, end_point, edgecolor, linewidth)
-        if cls != 0:
-            if cls_names is None:
-                cls_label = 'cls:%d' % cls
-            else:
-                cls_label = cls_names[int(cls)]
-            image = cv2.putText(image, cls_label, start_point, cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
-                                color=edgecolor, thickness=2)
+        #if cls != 0: #for multi-class detector
+        if cls_names is None:
+            cls_label = 'cls:%d' % cls
+        else:
+            cls_label = cls_names[int(cls)]
+        #append trid and conf to cls_label
+        trid = str(box['trackid'])
+        conf = str(round(box['conf'],2))
+        display_info = 'id:'+trid+' p:'+conf
+
+        image = cv2.putText(image, cls_label, start_point, cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.4,
+                            color=edgecolor, thickness=1)
+        image = cv2.putText(image, display_info, bot_right_point,
+                            cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.4,
+                            color=edgecolor, thickness=1)
 
     if title:
         if len(title) < 30:
@@ -61,6 +73,9 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
                 image = cv2.putText(image, title_split, (30, 30 + (si * 20)), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65,
                                     color=(int_max, int_max, int_max), thickness=1)
 
+    #display image
+    #plt.imshow(image)
+    #plt.show()
     return image
 
 def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=True, show_frame_name=True,
@@ -190,11 +205,11 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_fr
             #frame_id = int(frame_name)
             frame_name = str(frame_id)
             if show_preds and frame_name in logger.results[video_name] and 'boxes' in logger.results[video_name][frame_name]:
-                boxes = logger.results[video_name][frame_name]['boxes']
+                boxes = logger.results[video_name][frame_name]['boxes'] #get the boxes in that frame
             else:
                 boxes = []
             if show_labels and frame_name in logger.results[video_name]:
-                labels = logger.results[video_name][frame_name]['labels'] if 'labels' in logger.results[video_name][frame_name] else []
+                labels = logger.results[video_name][frame_name]['labels'] if 'labels' in logger.results[video_name][frame_name] else [] #get the labels in that frame
             else:
                 labels = []
             if box_display_method == 'top_N_frame_conf':
@@ -266,5 +281,6 @@ def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_p
         img_src_dict[frame_name] = cache_filename
     gif_filename = dir_path+'/'+current_video_cache_path + '/' + (video_name).replace('/', '_') + '.gif'
     print('save gif', gif_filename)
-    imageio.mimsave(gif_filename, imgs_uint8, fps=5)
+    imageio.mimsave(gif_filename, imgs_uint8, duration=200)
+
     return img_src_dict
