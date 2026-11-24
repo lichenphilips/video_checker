@@ -1,1 +1,6 @@
 .idea
+__pycache__/
+.ipynb_checkpoints/
+static/cache_imgs/
+*.log
+pid_*.txt

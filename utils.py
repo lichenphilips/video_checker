@@ -4,16 +4,23 @@ import copy
 import os
 import pydicom
 import pandas as pd
+import pickle
 import imageio
 from matplotlib.colors import hsv_to_rgb
 frame_ignore_list = ["depth","pix_per_cm","number_of_frames","cropping_start_point_row_col","cropping_width_height"]
 
 def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, cls_names=None, min_colormap=0):
     int_max =  1  # np.max(image)
+    if cls_names==['CON','PE']:
+        class_map = ['C','E']
+    elif cls_names==['PE','CON']:
+        class_map = ['E','C']
+    else:
+        class_map = cls_names
     if len(image.shape) == 2:
         image = np.repeat(image[:, :, None], 3, axis=2)
 
-    linewidth = 2
+    linewidth = 1
     # include ground truth labels
     paint_boxes = copy.deepcopy(labels)
     # include preditions
@@ -28,11 +35,19 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
         if 'conf' not in box:
             # labels
             edgecolor = [int_max, int_max, int_max]
+            linewidth = 2
         else:
+            linewidth = 1
+
             #blue to red color bar
             #edgecolor = [box['conf'] * int_max, 0, (1 - box['conf']) * int_max]
-            #dark orange to bright orange
-            edgecolor = hsv_to_rgb([16/239,1,min(1,(max(0,box['conf']-min_colormap))*2)]) * int_max
+            if cls_names==['CON','PE']:
+                edgecolor = [[205/255,105/255,39/255],[241/255,189/255,39/255]][int(cls)] #cls 0: PE, cls 1: CON
+            elif cls_names==['PE','CON']:
+                edgecolor = [[241/255,189/255,39/255],[205/255,105/255,39/255]][int(cls)] #cls 0: PE, cls 1: CON
+            else:
+                #dark orange to bright orange
+                edgecolor = hsv_to_rgb([16/239,1,min(1,(max(0,box['conf']-min_colormap))*2)]) * int_max
             #pass BGR to cv2 color
             edgecolor = edgecolor[::-1]
             # edgecolor = colors[int(cls)]
@@ -40,13 +55,15 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
         start_point = (int(round(labels_xyxy[0])), int(round(labels_xyxy[1])))
         end_point = (int(round(labels_xyxy[2])), int(round(labels_xyxy[3])))
         image = cv2.rectangle(image, start_point, end_point, edgecolor, linewidth)
-        if cls != 0:
+        if class_map == ['C','E'] or class_map == ['E','C'] or cls != 0:
             if cls_names is None:
                 cls_label = 'cls:%d' % cls
             else:
-                cls_label = cls_names[int(cls)]
-            image = cv2.putText(image, cls_label, start_point, cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
-                                color=edgecolor, thickness=2)
+                cls_label = class_map[int(cls)]
+            # image = cv2.putText(image, cls_label, start_point, cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+            #                     color=edgecolor, thickness=2)
+            image = cv2.putText(image, cls_label, [end_point[0]-10,end_point[1]-2], cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.4,
+                                 color=[1,1,1], thickness=1)
 
     if title:
         if len(title) < 30:
@@ -64,8 +81,10 @@ def paint_img_with_bb(image, boxes, labels=[], title=None, min_display_conf=0, c
     return image
 
 def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=True, show_frame_name=True,
-                  min_display_conf=0, img_type='jpg', cls_names=None):
+                  min_display_conf=0, img_type='jpg', cls_names=None, pad_square=False):
     data_dir_prefix = logger.results['platform']['data_dir_prefix']
+    if len(data_dir_prefix)>1 and not data_dir_prefix.endswith('/'):
+        data_dir_prefix = data_dir_prefix+'/'
     frame_name = '%d' % (frame_id)
     if img_type == 'jpg':
         img_filename = data_dir_prefix + video_name + '_%02d.jpg' % (frame_id)
@@ -77,8 +96,18 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
                 raise FileNotFoundError(img_filename)
         img = cv2.imread(img_filename)
         img = img / np.max(img)
+    elif img_type == 'png':
+        img_filename = data_dir_prefix + video_name + '/%03d.png'%frame_id
+        if not os.path.exists(img_filename):
+            if not os.path.exists(img_filename):
+                print('img_filename not exist', img_filename)
+                raise FileNotFoundError(img_filename)
+        img = cv2.imread(img_filename)
+        img = img / np.max(img)
     else:
         raise ValueError('undefined')
+    if pad_square:
+        img = image_pad_square(img)
     if show_preds:
         boxes = logger.results[video_name][frame_name]['boxes']
     else:
@@ -96,7 +125,7 @@ def get_ori_frame(video_name, frame_id, logger, show_labels=True, show_preds=Tru
 
 
 def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_frame_name=True, box_display_method='min_display_conf', 
-                    box_display_method_variable=0, img_type='jpg', cls_names=None, dcm_scan_param_csv_file=None):
+                    box_display_method_variable=0, img_type='jpg', cls_names=None, dcm_scan_param_csv_file=None,pad_square=False):
     imgs = []
     frames = sorted([k for k in logger.results[video_name].keys() if k not in frame_ignore_list], key=lambda x: int(x))
     if box_display_method == 'min_display_conf':
@@ -128,7 +157,26 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_fr
                     min_display_conf = 0
 
             img_bb = get_ori_frame(video_name, frame_id, logger, show_labels, show_preds, show_frame_name, min_display_conf, img_type,
-                                   cls_names)
+                                   cls_names, pad_square)
+            imgs.append(img_bb)
+    elif img_type == 'png':
+        for frame_name in frames:
+            frame_id = int(frame_name)
+            if box_display_method == 'top_N_frame_conf':
+                boxes = logger.results[video_name][frame_name]['boxes']
+                if box_display_method_variable>=len(boxes):
+                    min_display_conf = 0
+                else:
+                    min_display_conf = sorted([box['conf'] for box in boxes],reverse=True)[box_display_method_variable-1]
+            elif box_display_method == 'top_conf_frames_std':
+                if len(logger.results[video_name][frame_name]['boxes']):
+                    top_conf_frame = np.max([box['conf'] for box in logger.results[video_name][frame_name]['boxes']])
+                    min_display_conf = top_conf_frame - box_display_method_variable*top_conf_std
+                else:
+                    min_display_conf = 0
+
+            img_bb = get_ori_frame(video_name, frame_id, logger, show_labels, show_preds, show_frame_name, min_display_conf, img_type,
+                                   cls_names, pad_square)
             imgs.append(img_bb)
     else:
         if img_type == 'dcm':
@@ -181,9 +229,29 @@ def get_ori_video(video_name, logger, show_labels=True, show_preds=True, show_fr
             else:
                 raise ValueError('no dict')
             video_npy = video_npy / np.max(video_npy)
+        elif img_type == 'pickle':
+            if 'data_dir_prefix' in logger.results['platform']:
+                data_dir_prefix = logger.results['platform']['data_dir_prefix']
+            else:
+                data_dir_prefix = ''
+            if not os.path.exists(video_name + '.pickle'):
+                npz_video_name = data_dir_prefix + video_name + '.pickle'
+                if not os.path.exists(npz_video_name):
+                    raise FileExistsError('no such pickle', npz_video_name)
+            else:
+                npz_video_name = video_name + '.pickle'
+            with open(npz_video_name,'rb') as fp:
+                video_npy_dict = pickle.load(fp)
+            video_npy = []
+            for f in video_npy_dict:
+                video_npy.append(video_npy_dict[f]['imgs'])
+            video_npy = np.array(video_npy)
+            video_npy = video_npy / np.max(video_npy)
         else:
             raise ValueError('undefined')    
 
+        if pad_square:
+            video_npy = image_list_pad_square(video_npy)
         imgs = []
         #for frame_name in sorted([k for k in logger.results[video_name].keys() if k not in frame_ignore_list],key=lambda x:int(x)):
         for frame_id in range(video_npy.shape[0]):
@@ -268,3 +336,46 @@ def cache_display_images(dcm_cropped_imgs,video_name,frame_names,cache_dir,dir_p
     print('save gif', gif_filename)
     imageio.mimsave(gif_filename, imgs_uint8, fps=5)
     return img_src_dict
+
+def image_pad_square(image):
+    height, width, channels = image.shape
+    max_dim = max(height, width)
+    
+    # Calculate padding for height and width
+    pad_h = max_dim - height
+    pad_w = max_dim - width
+    
+    # Distribute padding evenly
+    pad_top = pad_h // 2
+    pad_bottom = pad_h - pad_top
+    pad_left = pad_w // 2
+    pad_right = pad_w - pad_left
+    
+    # Construct padding tuple: (before, after) for each axis
+    pad_width = (
+        (pad_top, pad_bottom),  # Height axis
+        (pad_left, pad_right),  # Width axis
+        (0, 0)                  # Channel axis (no padding)
+    )
+    
+    # Pad and store
+    padded_img = np.pad(image, pad_width, mode='constant', constant_values=0)
+    return padded_img
+
+def image_list_pad_square(image_list):
+    """
+    Pads a list of 3D image arrays (H, W, C) to make each image square.
+    
+    Parameters:
+    image_list (list of numpy.ndarray): List containing 3D arrays of shape (H, W, C)
+    
+    Returns:
+    list of numpy.ndarray: List of square padded 3D arrays.
+    """
+    padded_list = []
+    
+    for image in image_list:
+        padded_img = image_pad_square(image)
+        padded_list.append(padded_img)
+        
+    return padded_list

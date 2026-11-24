@@ -69,6 +69,9 @@ Medstar CON<span class="test_file">/home/pj-019468-si-data/Users/Jiahong/LCQ/GHL
 
 <label for="display_frame_name">Display video name:</label>
 <input type="checkbox" id="display_frame_name" name="display_frame_name">
+
+<label for="pad_square">Pad Square:</label>
+<input type="checkbox" id="pad_square" name="pad_square">
 </br>
 <button id="clear_cache"> Clear Cache </button>
 
@@ -144,9 +147,9 @@ $(function() {
         $(".selected_video").removeClass("selected_video");
         var video_name = $(this).attr("video_name")
         var sel_disp_method = $('input[name=box_sel]:checked').val()
-        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val()+"&disp_name="+$("#display_frame_name").is(':checked'))
+        console.log("submit get" + "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val()+"&disp_name="+$("#display_frame_name").is(':checked')+"&pad_square="+$("#pad_square").is(':checked'))
         $.ajax({
-            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val()+"&disp_name="+$("#display_frame_name").is(':checked'),
+            url: "/load_video?video_name="+encodeURIComponent(video_name)+"&"+sel_disp_method+"="+$("#"+sel_disp_method).val()+"&disp_name="+$("#display_frame_name").is(':checked')+"&pad_square="+$("#pad_square").is(':checked'),
             method: "GET",
             success: function (response) {
                 response_a = response

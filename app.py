@@ -40,7 +40,7 @@ def generate_video_list(logfile_name):
 		frames = [k for k in app.logger.results[video_name].keys() if k not in frame_ignore_list]
 		frame_num = len(frames)
 		label_num = sum([len(app.logger.results[video_name][frame]['labels']) for frame in frames if 'labels' in app.logger.results[video_name][frame]])
-		pred_num = sum([len(app.logger.results[video_name][frame]['boxes']) for frame in frames])
+		pred_num = sum([len(app.logger.results[video_name][frame]['boxes']) for frame in frames if 'boxes' in app.logger.results[video_name][frame]]) 
 		ret_dict.append({'video_name': video_name, 'frame_num': frame_num,
 						 'label_num': label_num, 'pred_num': pred_num})
 	return {'logger_profile': ret_dict}
@@ -74,6 +74,10 @@ def load_video():
 			disp_name = True
 	else:
 		disp_name = True
+	if 'pad_square' in request.args and request.args['pad_square']=='true':
+		pad_square = True
+	else:
+		pad_square = False
 
 	#frame_names = sorted([k for k in app.logger.results[video_name].keys() if k not in frame_ignore_list],key=lambda x:int(x))
 	#test whether gif exists
@@ -98,24 +102,30 @@ def load_video():
 		print('create cache',gif_filename)
 		if 'data_dir_prefix' in app.logger.results['platform']:
 			data_dir_prefix = app.logger.results['platform']['data_dir_prefix']
+			if len(data_dir_prefix)>1 and not data_dir_prefix.endswith('/'):
+				data_dir_prefix = data_dir_prefix+'/'
 		else:
 			data_dir_prefix = ''
 		if 'class_names' in app.logger.results['platform']:
 			cls_names = app.logger.results['platform']['class_names']
 		else:
-			cls_names = ['Con', 'SPC', 'PE', 'AT']
+			cls_names = ['Con', 'PE', 'AT', 'SPC']
 		#dcm_scan_param_csv_file = '/home/pj-019468-si/BARDA_ID/Code/barda_lus/blines/image_proc_algorithm/Read_params_from_DICOMS/output/medstar_dicom_scan_params_updated.csv'
 		dcm_scan_param_csv_file = '/home/pj-019468-si/radhika/DICOM_details_Medstar.csv'
 
-		if os.path.exists(data_dir_prefix + video_name + '.npz') or os.path.exists(video_name + '.npz'):
-			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names)
+		if os.path.exists(data_dir_prefix + video_name + '.pickle') or os.path.exists(video_name + '.pickle'):
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='pickle', cls_names=cls_names, pad_square=pad_square)
+		elif os.path.exists(data_dir_prefix + video_name + '.npz') or os.path.exists(video_name + '.npz'):
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names, pad_square=pad_square)
 		elif os.path.exists(data_dir_prefix + video_name + '.mp4.cropped.npz') or os.path.exists(video_name + '.mp4.cropped.npz'):
 			video_name = video_name
-			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names)
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='npz', cls_names=cls_names, pad_square=pad_square)
 		elif os.path.exists(data_dir_prefix + video_name + '.dcm.cropped.npz') or os.path.exists(video_name + '.dcm.cropped.npz'):
-			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='dcm_npz', cls_names=cls_names)
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='dcm_npz', cls_names=cls_names, pad_square=pad_square)
+		elif os.path.exists(data_dir_prefix + video_name + '/000.png') or os.path.exists(video_name + '/000.png'):
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='png', cls_names=cls_names, pad_square=pad_square)
 		else:
-			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='jpg', cls_names=cls_names, dcm_scan_param_csv_file=dcm_scan_param_csv_file)
+			painted_imgs = get_ori_video(video_name, app.logger, show_frame_name=disp_name, box_display_method=box_display_method, box_display_method_variable=box_display_method_variable, img_type='jpg', cls_names=cls_names, dcm_scan_param_csv_file=dcm_scan_param_csv_file, pad_square=pad_square)
 		frame_names = [str(i) for i in range(len(painted_imgs))]
 		img_src_dict = cache_display_images(painted_imgs,video_name,frame_names,cache_dir,dir_path,box_display_method,box_display_method_variable)
 	return {'img_src_dict': img_src_dict}
